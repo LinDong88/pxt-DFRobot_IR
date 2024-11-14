@@ -1,6 +1,5 @@
-// MakerBit blocks supporting a Keyestudio Infrared Wireless Module Kit
-// (receiver module+remote controller)
-
+//Library based on :https://github.com/1010Technologies/pxt-makerbit-background
+//Library based on :https://github.com/1010Technologies/pxt-makerbit-ir-receiver
 
 
 //% color=#0fbc11 icon="\u272a" block="MakerBit"
