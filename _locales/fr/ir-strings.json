@@ -1,4 +1,5 @@
 {
     "IR.IR_callbackUser|block": "quand l'IR reçoit",
+    "IR.IR_init|block": "Initialiser le capteur infrarouge.",
     "IR.IR_read|block": "lire l'infrarouge"
 }

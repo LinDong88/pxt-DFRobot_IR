@@ -10,7 +10,6 @@
         "main.blocks",
         "main.ts",
         "README.md",
-        "ReceiverIR.cpp",
         "_locales/zh-cn/ir-strings.json",
         "_locales/zh-tw/ir-strings.json",
         "_locales/pt/ir-strings.json",

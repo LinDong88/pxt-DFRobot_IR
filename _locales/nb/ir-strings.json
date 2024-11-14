@@ -1,4 +1,5 @@
 {
     "IR.IR_callbackUser|block": "Når Infrarød mottar ",
+    "IR.IR_init|block": "Initialiser infrarød sensor.",
     "IR.IR_read|block": "Les Infrarød tast"
 }

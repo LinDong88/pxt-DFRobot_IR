@@ -1,4 +1,5 @@
 {
     "IR.IR_read|block": "紅外線數值",
+    "IR.IR_init|block": "初始化紅外傳感器",
     "IR.IR_callbackUser|block": "當接收到紅外線時運行"
 }

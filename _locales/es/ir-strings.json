@@ -1,5 +1,6 @@
 {
     "IR.IR_callbackUser|block": "Al recibir IR",
+    "IR.IR_init|block": "Inicializar el sensor infrarrojo",
     "IR.IR_read|block": "Leer IR"
   
 }

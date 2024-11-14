@@ -1,4 +1,5 @@
 {
     "IR.IR_callbackUser|block": "ИК: при получении кода",
+    "IR.IR_init|block": "Инициализация инфракрасного датчика.",
     "IR.IR_read|block": "ИК: код с пульта"
 }

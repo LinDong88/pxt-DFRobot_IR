@@ -2,167 +2,11 @@
 //Library based on :https://github.com/1010Technologies/pxt-makerbit-ir-receiver
 
 
-//% color=#0fbc11 icon="\u272a" block="MakerBit"
-//% category="MakerBit"
-namespace makerbit {
-    export namespace background {
-
-        export enum Thread {
-            Priority = 0,
-            UserCallback = 1,
-        }
-
-        export enum Mode {
-            Repeat,
-            Once,
-        }
-
-        class Executor {
-            _newJobs: Job[] = undefined;
-            _jobsToRemove: number[] = undefined;
-            _pause: number = 100;
-            _type: Thread;
-
-            constructor(type: Thread) {
-                this._type = type;
-                this._newJobs = [];
-                this._jobsToRemove = [];
-                control.runInParallel(() => this.loop());
-            }
-
-            push(task: () => void, delay: number, mode: Mode): number {
-                if (delay > 0 && delay < this._pause && mode === Mode.Repeat) {
-                    this._pause = Math.floor(delay);
-                }
-                const job = new Job(task, delay, mode);
-                this._newJobs.push(job);
-                return job.id;
-            }
-
-            cancel(jobId: number) {
-                this._jobsToRemove.push(jobId);
-            }
-
-            loop(): void {
-                const _jobs: Job[] = [];
-
-                let previous = control.millis();
-
-                while (true) {
-                    const now = control.millis();
-                    const delta = now - previous;
-                    previous = now;
-
-                    // Add new jobs
-                    this._newJobs.forEach(function (job: Job, index: number) {
-                        _jobs.push(job);
-                    });
-                    this._newJobs = [];
-
-                    // Cancel jobs
-                    this._jobsToRemove.forEach(function (jobId: number, index: number) {
-                        for (let i = _jobs.length - 1; i >= 0; i--) {
-                            const job = _jobs[i];
-                            if (job.id == jobId) {
-                                _jobs.removeAt(i);
-                                break;
-                            }
-                        }
-                    });
-                    this._jobsToRemove = []
-
-
-                    // Execute all jobs
-                    if (this._type === Thread.Priority) {
-                        // newest first
-                        for (let i = _jobs.length - 1; i >= 0; i--) {
-                            if (_jobs[i].run(delta)) {
-                                this._jobsToRemove.push(_jobs[i].id)
-                            }
-                        }
-                    } else {
-                        // Execute in order of schedule
-                        for (let i = 0; i < _jobs.length; i++) {
-                            if (_jobs[i].run(delta)) {
-                                this._jobsToRemove.push(_jobs[i].id)
-                            }
-                        }
-                    }
-
-                    basic.pause(this._pause);
-                }
-            }
-        }
-
-        class Job {
-            id: number;
-            func: () => void;
-            delay: number;
-            remaining: number;
-            mode: Mode;
-
-            constructor(func: () => void, delay: number, mode: Mode) {
-                this.id = randint(0, 2147483647)
-                this.func = func;
-                this.delay = delay;
-                this.remaining = delay;
-                this.mode = mode;
-            }
-
-            run(delta: number): boolean {
-                if (delta <= 0) {
-                    return false;
-                }
-
-                this.remaining -= delta;
-                if (this.remaining > 0) {
-                    return false;
-                }
-
-                switch (this.mode) {
-                    case Mode.Once:
-                        this.func();
-                        basic.pause(0);
-                        return true;
-                    case Mode.Repeat:
-                        this.func();
-                        this.remaining = this.delay;
-                        basic.pause(0);
-                        return false;
-                }
-            }
-        }
-
-        const queues: Executor[] = [];
-
-        export function schedule(
-            func: () => void,
-            type: Thread,
-            mode: Mode,
-            delay: number,
-        ): number {
-            if (!func || delay < 0) return 0;
-
-            if (!queues[type]) {
-                queues[type] = new Executor(type);
-            }
-
-            return queues[type].push(func, delay, mode);
-        }
-
-        export function remove(type: Thread, jobId: number): void {
-            if (queues[type]) {
-                queues[type].cancel(jobId);
-            }
-        }
-    }
-}
-
-
-
-//% color=#0fbc11 icon="\u272a" block="MakerBit"
-//% category="MakerBit"
-namespace makerbit {
+/**
+ * Custom blocks
+ */
+//% weight=100 color=#0fbc11 icon="\uf1eb" block="IR"
+namespace IR {
     let irState: IrState;
     const IR_REPEAT = 256;
     const IR_INCOMPLETE = 257;
@@ -177,7 +21,7 @@ namespace makerbit {
         loword: uint16;
         activeCommand: number;
         repeatTimeout: number;
-        onIrDatagram: () => void;
+        IR_callbackUser: () => void;
     }
 
 
@@ -256,8 +100,8 @@ namespace makerbit {
         if (irEvent === IR_DATAGRAM) {
             irState.hasNewDatagram = true;
 
-            if (irState.onIrDatagram) {
-                background.schedule(irState.onIrDatagram, background.Thread.UserCallback, background.Mode.Once, 0);
+            if (irState.IR_callbackUser) {
+                background.schedule(irState.IR_callbackUser, background.Thread.UserCallback, background.Mode.Once, 0);
             }
 
             const newCommand = irState.commandSectionBits >> 8;
@@ -279,23 +123,20 @@ namespace makerbit {
             loword: 0,
             activeCommand: -1,
             repeatTimeout: 0,
-            onIrDatagram: undefined,
+            IR_callbackUser: undefined,
         };
     }
 
     /**
-     * Connects to the IR receiver module at the specified pin and configures the IR protocol.
-     * @param pin IR receiver pin, eg: DigitalPin.P0
-     * @param protocol IR protocol, eg: IrProtocol.Keyestudio
+     * Init IR .
      */
-    //% subcategory="IR Receiver"
-    //% blockId="makerbit_infrared_connect_receiver"
-    //% block="connect IR receiver at pin %pin and decode %protocol"
+    //% blockId="IR_init"
+    //% block="Init IR"
     //% pin.fieldEditor="gridpicker"
     //% pin.fieldOptions.columns=4
     //% pin.fieldOptions.tooltips="false"
     //% weight=90
-    export function connectIrReceiver(): void {
+    export function IR_init(): void {
         initIrState();
         enableIrMarkSpaceDetection(DigitalPin.P16)
         background.schedule(notifyIrEvents, background.Thread.Priority, background.Mode.Repeat, REPEAT_TIMEOUT_MS);
@@ -324,51 +165,26 @@ namespace makerbit {
      * Do something when an IR datagram is received.
      * @param handler body code to run when the event is raised
      */
-    //% subcategory="IR Receiver"
-    //% blockId=makerbit_infrared_on_ir_datagram
+    //% blockId= IR_callbackUser
     //% block="on IR datagram received"
     //% weight=40
-    export function onIrDatagram(handler: () => void) {
+    export function IR_callbackUser(handler: () => void) {
         initIrState();
-        irState.onIrDatagram = handler;
+        irState.IR_callbackUser = handler;
     }
 
     /**
      * Returns the IR datagram as 32-bit hexadecimal string.
      * The last received datagram is returned or "0x00000000" if no data has been received yet.
      */
-    //% subcategory="IR Receiver"
-    //% blockId=makerbit_infrared_ir_datagram
+    //% blockId=IR_read
     //% block="IR datagram"
     //% weight=30
-    export function irDatagram(): string {
+    export function IR_read(): number {
         basic.pause(0); // Yield to support background processing when called in tight loops
         initIrState();
-        return (
-            // "0x" +ir_rec_to16BitHex(irState.addressSectionBits) + ir_rec_to16BitHex(irState.commandSectionBits) 
-            ir_rec_to16BitHex(irState.commandSectionBits & 0x00ff)
-        );
+        return transMind(irState.commandSectionBits & 0x00ff)
     }
-
-    /**
-     * Returns true if any IR data was received since the last call of this function. False otherwise.
-     */
-    //% subcategory="IR Receiver"
-    //% blockId=makerbit_infrared_was_any_ir_datagram_received
-    //% block="IR data was received"
-    //% weight=80
-    export function wasIrDataReceived(): boolean {
-        basic.pause(0); // Yield to support background processing when called in tight loops
-        initIrState();
-        if (irState.hasNewDatagram) {
-            irState.hasNewDatagram = false;
-            return true;
-        } else {
-            return false;
-        }
-    }
-
-
     function ir_rec_to16BitHex(value: number): string {
         let hex = "";
         for (let pos = 0; pos < 4; pos++) {
@@ -382,9 +198,191 @@ namespace makerbit {
         }
         return hex;
     }
+    function transMind(data :number):number{
+        switch (data) {
+            case 255  : data = 0; break;
+            case 127  : data = 1; break;
+            case 191  : data = 2; break;
+            case 223  : data = 4; break;
+            case 95   : data = 5; break;
+            case 159  : data = 6; break;
+            case 239  : data = 8; break;
+            case 111  : data = 9; break;
+            case 175  : data = 10; break;
+            case 207  : data = 12; break;
+            case 79   : data = 13; break;
+            case 143  : data = 14; break;
+            case 247  : data = 16; break;
+            case 119  : data = 17; break;
+            case 183  : data = 18; break;
+            case 215  : data = 20; break;
+            case 87   : data = 21; break;
+            case 151  : data = 22; break;
+            case 231  : data = 24; break;
+            case 103  : data = 25; break;
+            case 167  : data = 26; break;
+            default: break;
+        }
+        return data;
+    }
+
+
 }
 
 
 
+
+//% deprecated=true
+namespace background {
+
+    export enum Thread {
+        Priority = 0,
+        UserCallback = 1,
+    }
+
+    export enum Mode {
+        Repeat,
+        Once,
+    }
+
+    class Executor {
+        _newJobs: Job[] = undefined;
+        _jobsToRemove: number[] = undefined;
+        _pause: number = 100;
+        _type: Thread;
+
+        constructor(type: Thread) {
+            this._type = type;
+            this._newJobs = [];
+            this._jobsToRemove = [];
+            control.runInParallel(() => this.loop());
+        }
+
+        push(task: () => void, delay: number, mode: Mode): number {
+            if (delay > 0 && delay < this._pause && mode === Mode.Repeat) {
+                this._pause = Math.floor(delay);
+            }
+            const job = new Job(task, delay, mode);
+            this._newJobs.push(job);
+            return job.id;
+        }
+
+        cancel(jobId: number) {
+            this._jobsToRemove.push(jobId);
+        }
+
+        loop(): void {
+            const _jobs: Job[] = [];
+
+            let previous = control.millis();
+
+            while (true) {
+                const now = control.millis();
+                const delta = now - previous;
+                previous = now;
+
+                // Add new jobs
+                this._newJobs.forEach(function (job: Job, index: number) {
+                    _jobs.push(job);
+                });
+                this._newJobs = [];
+
+                // Cancel jobs
+                this._jobsToRemove.forEach(function (jobId: number, index: number) {
+                    for (let i = _jobs.length - 1; i >= 0; i--) {
+                        const job = _jobs[i];
+                        if (job.id == jobId) {
+                            _jobs.removeAt(i);
+                            break;
+                        }
+                    }
+                });
+                this._jobsToRemove = []
+
+
+                // Execute all jobs
+                if (this._type === Thread.Priority) {
+                    // newest first
+                    for (let i = _jobs.length - 1; i >= 0; i--) {
+                        if (_jobs[i].run(delta)) {
+                            this._jobsToRemove.push(_jobs[i].id)
+                        }
+                    }
+                } else {
+                    // Execute in order of schedule
+                    for (let i = 0; i < _jobs.length; i++) {
+                        if (_jobs[i].run(delta)) {
+                            this._jobsToRemove.push(_jobs[i].id)
+                        }
+                    }
+                }
+
+                basic.pause(this._pause);
+            }
+        }
+    }
+
+    class Job {
+        id: number;
+        func: () => void;
+        delay: number;
+        remaining: number;
+        mode: Mode;
+
+        constructor(func: () => void, delay: number, mode: Mode) {
+            this.id = randint(0, 2147483647)
+            this.func = func;
+            this.delay = delay;
+            this.remaining = delay;
+            this.mode = mode;
+        }
+
+        run(delta: number): boolean {
+            if (delta <= 0) {
+                return false;
+            }
+
+            this.remaining -= delta;
+            if (this.remaining > 0) {
+                return false;
+            }
+
+            switch (this.mode) {
+                case Mode.Once:
+                    this.func();
+                    basic.pause(0);
+                    return true;
+                case Mode.Repeat:
+                    this.func();
+                    this.remaining = this.delay;
+                    basic.pause(0);
+                    return false;
+            }
+        }
+    }
+
+    const queues: Executor[] = [];
+
+    export function schedule(
+        func: () => void,
+        type: Thread,
+        mode: Mode,
+        delay: number,
+    ): number {
+        if (!func || delay < 0) return 0;
+
+        if (!queues[type]) {
+            queues[type] = new Executor(type);
+        }
+
+        return queues[type].push(func, delay, mode);
+    }
+
+    export function remove(type: Thread, jobId: number): void {
+        if (queues[type]) {
+            queues[type].cancel(jobId);
+        }
+    }
+}
 
 

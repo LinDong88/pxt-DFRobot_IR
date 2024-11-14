@@ -1,6 +1,7 @@
 {
    
     "IR.IR_callbackUser|block": "赤外線(V2): IRコードを受信したとき",
+    "IR.IR_init|block": "赤外線センサーを初期化する",
     "IR.IR_read|block": "赤外線リモコンのキー値(V2)"
     
 }
